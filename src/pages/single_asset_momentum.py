@@ -38,8 +38,28 @@ def app():
         "Bollinger Band": BBStrategy
     }
 
+    # Select a Strategy
     selected_strategy_key = st.selectbox('Select a strategy', list(strategy_dict.keys()))
     selected_strategy = strategy_dict[selected_strategy_key]
+
+    # Set Strategy Parameters
+    params = dict()
+    if selected_strategy_key == "Moving Average Crossover":
+        short_term = st.number_input("Set Short-term Moving Average Lookback Period", value=10)
+        long_term = st.number_input("Set Long-term Moving Average Lookback Period", value=20)
+        params['short_term'] = short_term
+        params['long_term'] = long_term
+
+    elif selected_strategy_key == "Relative Strength Index":
+        lookback_period = st.number_input("Set RSI Lookback Period", value=14)
+        params['lookback_period'] = lookback_period
+
+    elif selected_strategy_key == "Bollinger Band":
+        lookback_period = st.number_input("Set Bollinger Band Lookback Period", value=20)
+        params['lookback_period'] = lookback_period
+
+    # Set Transaction Cost (%)
+    cost = st.number_input("Set Transaction Cost (%)", value=0.1) * 0.01
 
     if (st.button('Execute backtest')):
         # 데이터 로드
@@ -47,10 +67,10 @@ def app():
 
         # 백테스트 진행
         bt = Backtest(price_df, selected_strategy,
-                      cash=1000000, commission=.002,
+                      cash=1000000, commission=cost,
                       exclusive_orders=True)
 
-        output = bt.run()
+        output = bt.run(**params)
         output_df = pd.DataFrame(output)
         st.dataframe(output_df[:-2], height=800)
         bt.plot(open_browser=False, filename="backtest_plot")
@@ -60,10 +80,13 @@ def app():
 
 class SmaCross(Strategy):
 
+    short_term = 10
+    long_term = 20
+
     def init(self):
         close = self.data.Close
-        self.sma1 = self.I(SMA, close, 10)
-        self.sma2 = self.I(SMA, close, 20)
+        self.sma1 = self.I(SMA, close, self.short_term)
+        self.sma2 = self.I(SMA, close, self.long_term)
 
     def next(self):
         if crossover(self.sma1, self.sma2):
@@ -83,7 +106,9 @@ def RSI(array, n):
 
 class RSIStrategy(Strategy):
 
-    def init(self):
+    lookback_period = 14
+
+    def init(self, lookback_period=14):
         # Compute moving averages the strategy demands
         self.ma10 = self.I(SMA, self.data.Close, 10)
         self.ma20 = self.I(SMA, self.data.Close, 20)
@@ -91,7 +116,7 @@ class RSIStrategy(Strategy):
         self.ma100 = self.I(SMA, self.data.Close, 100)
 
         # Compute daily RSI
-        self.daily_rsi = self.I(RSI, self.data.Close, 30)
+        self.daily_rsi = self.I(RSI, self.data.Close, self.lookback_period)
         self.buy_level = 30
         self.sell_level = 70
 
@@ -118,11 +143,12 @@ def BB(array, n, is_upper):
 
 class BBStrategy(Strategy):
 
-    def init(self):
+    lookback_period = 20
 
+    def init(self):
         # Compute daily Bollinger Band
-        self.upper_bb = self.I(BB, self.data.Close, 20, True)
-        self.lower_bb = self.I(BB, self.data.Close, 20, False)
+        self.upper_bb = self.I(BB, self.data.Close, self.lookback_period, True)
+        self.lower_bb = self.I(BB, self.data.Close, self.lookback_period, False)
 
     def next(self):
         price = self.data.Close[-1]
