@@ -35,7 +35,8 @@ def app():
     strategy_dict = {
         "Moving Average Crossover": SmaCross,
         "Relative Strength Index": RSIStrategy,
-        "Bollinger Band": BBStrategy
+        "Bollinger Band": BBStrategy,
+        "Donchain Channel": DonchainStrategy
     }
 
     # Select a Strategy
@@ -52,16 +53,24 @@ def app():
 
     elif selected_strategy_key == "Relative Strength Index":
         lookback_period = st.number_input("Set RSI Lookback Period", value=14)
+        buy_level = st.number_input("Set RSI Buy Level", value=50)
+        sell_level = st.number_input("Set RSI Sell Level", value=50)
         params['lookback_period'] = lookback_period
+        params['buy_level'] = buy_level
+        params['sell_level'] = sell_level
 
     elif selected_strategy_key == "Bollinger Band":
         lookback_period = st.number_input("Set Bollinger Band Lookback Period", value=20)
         params['lookback_period'] = lookback_period
 
+    elif selected_strategy_key == "Donchain Channel":
+        lookback_period = st.number_input("Set Donchain Channel Lookback Period", value=100)
+        params['lookback_period'] = lookback_period
+
     # Set Transaction Cost (%)
     cost = st.number_input("Set Transaction Cost (%)", value=0.1) * 0.01
 
-    if (st.button('Execute backtest')):
+    if st.button('Execute backtest'):
         # 데이터 로드
         price_df = fdr.DataReader(selected_stock_value, '2015-01-01')
 
@@ -107,6 +116,8 @@ def RSI(array, n):
 class RSIStrategy(Strategy):
 
     lookback_period = 14
+    buy_level = 50
+    sell_level = 50
 
     def init(self, lookback_period=14):
         # Compute moving averages the strategy demands
@@ -117,26 +128,24 @@ class RSIStrategy(Strategy):
 
         # Compute daily RSI
         self.daily_rsi = self.I(RSI, self.data.Close, self.lookback_period)
-        self.buy_level = 30
-        self.sell_level = 70
 
     def next(self):
         price = self.data.Close[-1]
 
         # If we don't already have a position, and
         # if all conditions are satisfied, enter long.
-        if self.daily_rsi[-1] < self.buy_level:
+        if self.daily_rsi[-1] > self.buy_level:
             self.buy()
 
-        elif self.daily_rsi[-1] > self.sell_level:
+        elif self.daily_rsi[-1] < self.sell_level:
             self.sell()
 
 def BB(array, n, is_upper):
     sma = pd.Series(array).rolling(n).mean()
     std = pd.Series(array).rolling(n).std()
-    upper_bb = sma + std * 2
-    lower_bb = sma - std * 2
-    if (is_upper == True):
+    upper_bb = sma + std * 1
+    lower_bb = sma - std * 1
+    if is_upper:
         return upper_bb
     else:
         return lower_bb
@@ -154,7 +163,32 @@ class BBStrategy(Strategy):
         price = self.data.Close[-1]
 
         if self.upper_bb[-1] < price:
-            self.sell()
+            self.buy()
 
         elif self.lower_bb[-1] > price:
+            self.sell()
+
+def Donchain(array, n, is_upper):
+    rolling_max = pd.Series(array).rolling(n).max()
+    rolling_min = pd.Series(array).rolling(n).min()
+    if is_upper:
+        return rolling_max
+    else:
+        return rolling_min
+
+class DonchainStrategy(Strategy):
+
+    lookback_period = 100
+
+    def init(self):
+        # Compute Donchain Channel
+        self.upper_dc = self.I(Donchain, self.data.Close, self.lookback_period, True)
+        self.lower_dc = self.I(Donchain, self.data.Close, self.lookback_period, False)
+
+    def next(self):
+        price = self.data.Close[-1]
+
+        if self.upper_dc[-1] <= price:
             self.buy()
+        elif self.lower_dc[-1] >= price:
+            self.sell()
