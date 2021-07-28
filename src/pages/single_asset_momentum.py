@@ -134,10 +134,10 @@ class RSIStrategy(Strategy):
 
         # If we don't already have a position, and
         # if all conditions are satisfied, enter long.
-        if self.daily_rsi[-1] > self.buy_level:
+        if self.daily_rsi[-1] > self.buy_level and not self.position.is_long:
             self.buy()
 
-        elif self.daily_rsi[-1] < self.sell_level:
+        elif self.daily_rsi[-1] < self.sell_level and not self.position.is_short:
             self.sell()
 
 def BB(array, n, is_upper):
@@ -162,10 +162,10 @@ class BBStrategy(Strategy):
     def next(self):
         price = self.data.Close[-1]
 
-        if self.upper_bb[-1] < price:
+        if self.upper_bb[-1] < price and not self.position.is_long:
             self.buy()
 
-        elif self.lower_bb[-1] > price:
+        elif self.lower_bb[-1] > price and not self.position.is_short:
             self.sell()
 
 def Donchain(array, n, is_upper):
@@ -188,7 +188,7 @@ class DonchainStrategy(Strategy):
     def next(self):
         price = self.data.Close[-1]
 
-        if self.upper_dc[-1] <= price:
+        if self.upper_dc[-1] <= price and not self.position.is_long:
             self.buy()
-        elif self.lower_dc[-1] >= price:
+        elif self.lower_dc[-1] >= price and not self.position.is_short:
             self.sell()
