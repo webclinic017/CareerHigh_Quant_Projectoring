@@ -58,11 +58,10 @@ def app():
         st.dataframe(perf_stats, height=1000)
         drawdown_df = momentum.get_drawdown_table()
         st.dataframe(drawdown_df)
-
-
-        fig = momentum.performance_analytics()
-        st.set_option('deprecation.showPyplotGlobalUse', False)
-        st.pyplot(fig)
+        with st.spinner("Plotting backtest statistics ..."):
+            fig = momentum.performance_analytics()
+            st.set_option('deprecation.showPyplotGlobalUse', False)
+            st.pyplot(fig)
 
 class CrossAssetMomentum():
     def __init__(self, prices, lookback_period, holding_period, n_selection, cost=0.001, signal_method='dm',
